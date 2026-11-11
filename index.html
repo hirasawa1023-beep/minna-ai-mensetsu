@@ -126,7 +126,31 @@ async function nextScene(){
 }
 function consultTeacherFromScene(){app.innerHTML=shell(`<section class="card scene"><div><div style="font-size:4rem">🙋</div><h1>先生に相談</h1><p>入室練習を一時停止しています。近くの先生に、この画面を見せてください。</p><div class="notice warning">「再開」を押すと、止めた手順から続けられます。終了するとカメラを停止してホームへ戻ります。</div><div class="row center"><button class="btn primary" onclick="go('scene')">先生と確認して再開</button><button class="btn danger" onclick="endFromConsult()">面接練習を終了</button></div></div></section>`,false)}
 function currentQuestion(){return state.sessionQuestions[state.index]}
-function needsFollowup(q,a){const t=a.trim();if(!q.followup)return false;if(t.length<18)return true;const concrete=/たとえば|例えば|とき|時に|委員会|授業|行事|友達|先生|家で|説明会|見学|実習|仕事|理由|ため/.test(t);const conclusionOnly=/^(はい|いいえ|あります|ありません|です|好きです|苦手です)[。！]?$/ .test(t);return conclusionOnly||(!concrete&&t.length<45)}function makeFollowup(q,a){const c=characterProfile();const lead=a.trim().length<12?(c.followShort||'もう少し詳しく教えてください。'):(c.followSpecific||'具体的な出来事を教えてください。');return `${c.ack||''}${c.ack?' ':''}${lead} ${q.followup||''}`.trim()}
+// Ver.7.6: 質問の意味に合わない深掘りを防止する
+function followupAllowed(q){
+  const text=String(q?.text||'').replace(/\s/g,'');
+  const follow=String(q?.followup||'').trim();
+  if(!follow)return false;
+  // 名前・学校・学年・時刻・挨拶などの事実確認には理由を求めない
+  if(/名前|氏名|中学校名|学校名|何年生|学年|何歳|年齢|何時|何分|誕生日|生年月日|住所|通学方法|体調|緊張していますか|最後に伝えたい|質問はありますか|自己紹介|あなたのことを教えて/.test(text))return false;
+  // 質問ごとに具体的に用意された深掘りだけを使う
+  if(/^(理由や具体的な出来事を教えてください。?|その理由を教えてください。?|もう少し詳しく教えてください。?)$/.test(follow))return false;
+  // 経験・理由・工夫・志望・将来など説明を深められる質問のみ対象
+  return /理由|なぜ|どうして|長所|短所|頑張|努力|工夫|経験|出来事|思い出|志望|魅力|学びたい|将来|仕事|困った|協力|大切|改善|目標|得意|苦手/.test(text);
+}
+function needsFollowup(q,a){
+  if(!followupAllowed(q))return false;
+  const t=String(a||'').trim();
+  if(!t||t==='（スキップ）')return false;
+  if(t.length>=45)return false;
+  const concrete=/たとえば|例えば|とき|時に|委員会|授業|行事|友達|先生|家で|説明会|見学|実習|仕事|理由|ため|ので|から|しました|できました/.test(t);
+  return !concrete;
+}
+function makeFollowup(q,a){
+  // 面接官の汎用追質問を重ねず、質問バンクに登録された適切な一問だけを聞く
+  const c=characterProfile();
+  return `${c.ack||'ありがとうございます。'} ${q.followup}`.trim();
+}
 function persistentCamera(){return `<div class="liveCamera"><video id="selfCamera" autoplay muted playsinline></video><div class="eyeGuide"></div><span class="cameraLabel">白い丸を意識して見てみよう</span></div><div class="postureGrid"><div class="postureItem">✓ 背筋を伸ばす</div><div class="postureItem">✓ 顔を上げる</div><div class="postureItem">✓ 手は膝の上</div><div class="postureItem">✓ 画面に近づきすぎない</div></div>`}
 function interviewView(){markQuestionShown();const q=currentQuestion();const isF=state.phase==='follow';const lead=characterQuestionLead(isF);const prompt=isF?state.followupQuestion:(lead?`${lead}
 
